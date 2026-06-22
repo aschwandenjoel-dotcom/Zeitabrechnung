@@ -1,33 +1,28 @@
-"use client";
-
 import { TimeEntry } from "./types";
 
-const STORAGE_KEY = "zeitabrechnung_entries";
-
-export function getEntries(): TimeEntry[] {
-  if (typeof window === "undefined") return [];
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    return raw ? JSON.parse(raw) : [];
-  } catch {
-    return [];
-  }
+export async function getEntries(): Promise<TimeEntry[]> {
+  const res = await fetch("/api/entries", { cache: "no-store" });
+  return res.json();
 }
 
-export function saveEntry(entry: TimeEntry): void {
-  const entries = getEntries();
-  entries.push(entry);
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(entries));
+export async function saveEntry(entry: TimeEntry): Promise<void> {
+  await fetch("/api/entries", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(entry),
+  });
 }
 
-export function updateEntry(updated: TimeEntry): void {
-  const entries = getEntries().map((e) => (e.id === updated.id ? updated : e));
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(entries));
+export async function updateEntry(entry: TimeEntry): Promise<void> {
+  await fetch(`/api/entries/${entry.id}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(entry),
+  });
 }
 
-export function deleteEntry(id: string): void {
-  const entries = getEntries().filter((e) => e.id !== id);
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(entries));
+export async function deleteEntry(id: string): Promise<void> {
+  await fetch(`/api/entries/${id}`, { method: "DELETE" });
 }
 
 export function generateId(): string {
@@ -37,7 +32,7 @@ export function generateId(): string {
 export function calcDuration(startTime: string, endTime: string): number {
   const [sh, sm] = startTime.split(":").map(Number);
   const [eh, em] = endTime.split(":").map(Number);
-  return (eh * 60 + em) - (sh * 60 + sm);
+  return eh * 60 + em - (sh * 60 + sm);
 }
 
 export function formatDuration(minutes: number): string {

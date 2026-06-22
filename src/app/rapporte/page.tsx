@@ -11,7 +11,7 @@ export default function RapportePage() {
   const [selectedMonth, setSelectedMonth] = useState(format(new Date(), "yyyy-MM"));
 
   useEffect(() => {
-    setEntries(getEntries());
+    getEntries().then(setEntries);
   }, []);
 
   const monthStart = startOfMonth(parseISO(selectedMonth + "-01"));

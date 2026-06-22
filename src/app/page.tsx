@@ -1,31 +1,28 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { format } from "date-fns";
 import { de } from "date-fns/locale";
-import {
-  getEntries,
-  saveEntry,
-  deleteEntry,
-  generateId,
-  calcDuration,
-  formatDuration,
-  formatChf,
-} from "@/lib/storage";
+import { getEntries, saveEntry, deleteEntry, generateId, calcDuration, formatDuration, formatChf } from "@/lib/storage";
 import { TimeEntry, HOURLY_RATE } from "@/lib/types";
+import TimeSelect from "@/components/TimeSelect";
+import { useTimer } from "@/lib/TimerContext";
+
+function formatElapsed(seconds: number) {
+  const h = Math.floor(seconds / 3600).toString().padStart(2, "0");
+  const m = Math.floor((seconds % 3600) / 60).toString().padStart(2, "0");
+  const s = (seconds % 60).toString().padStart(2, "0");
+  return `${h}:${m}:${s}`;
+}
 
 export default function HomePage() {
-  const [entries, setEntries] = useState<TimeEntry[]>([]);
-  const [running, setRunning] = useState(false);
-  const [elapsed, setElapsed] = useState(0);
-  const [startedAt, setStartedAt] = useState<Date | null>(null);
-  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const { running, paused, elapsed, start, pause, resume, stop } = useTimer();
 
-  const [form, setForm] = useState({
-    date: format(new Date(), "yyyy-MM-dd"),
-    startTime: "",
-    endTime: "",
-    description: "",
+  const [entries, setEntries] = useState<TimeEntry[]>([]);
+  const [form, setForm] = useState(() => {
+    const now = new Date();
+    const t = format(now, "HH:mm");
+    return { date: format(now, "yyyy-MM-dd"), startTime: t, endTime: t, description: "" };
   });
   const [formError, setFormError] = useState("");
 
@@ -33,59 +30,26 @@ export default function HomePage() {
   const todayEntries = entries.filter((e) => e.date === today);
   const todayMinutes = todayEntries.reduce((s, e) => s + e.durationMinutes, 0);
 
-  useEffect(() => {
-    setEntries(getEntries());
-  }, []);
-
-  useEffect(() => {
-    if (running) {
-      intervalRef.current = setInterval(() => {
-        setElapsed((prev) => prev + 1);
-      }, 1000);
-    } else {
-      if (intervalRef.current) clearInterval(intervalRef.current);
-    }
-    return () => {
-      if (intervalRef.current) clearInterval(intervalRef.current);
-    };
-  }, [running]);
-
-  function formatElapsed(seconds: number) {
-    const h = Math.floor(seconds / 3600).toString().padStart(2, "0");
-    const m = Math.floor((seconds % 3600) / 60).toString().padStart(2, "0");
-    const s = (seconds % 60).toString().padStart(2, "0");
-    return `${h}:${m}:${s}`;
+  async function reload() {
+    setEntries(await getEntries());
   }
 
-  function handleStart() {
-    const now = new Date();
-    setStartedAt(now);
-    setElapsed(0);
-    setRunning(true);
-  }
+  useEffect(() => { reload(); }, []);
 
   function handleStop() {
-    setRunning(false);
-    if (!startedAt) return;
-    const now = new Date();
-    const durationMinutes = Math.round((now.getTime() - startedAt.getTime()) / 60000);
-    if (durationMinutes < 1) return;
-
-    const entry: TimeEntry = {
-      id: generateId(),
-      date: format(startedAt, "yyyy-MM-dd"),
-      startTime: format(startedAt, "HH:mm"),
-      endTime: format(now, "HH:mm"),
-      durationMinutes,
+    const result = stop();
+    if (!result) return;
+    // Stopp füllt das Formular vor — kein Auto-Save
+    setForm({
+      date: result.date,
+      startTime: result.startTime,
+      endTime: result.endTime,
       description: "",
-    };
-    saveEntry(entry);
-    setEntries(getEntries());
-    setElapsed(0);
-    setStartedAt(null);
+    });
+    setFormError("");
   }
 
-  function handleManualSubmit(e: React.FormEvent) {
+  async function handleManualSubmit(e: React.FormEvent) {
     e.preventDefault();
     setFormError("");
     const { date, startTime, endTime, description } = form;
@@ -98,57 +62,70 @@ export default function HomePage() {
       setFormError("Endzeit muss nach Startzeit liegen.");
       return;
     }
-    const entry: TimeEntry = {
-      id: generateId(),
-      date,
-      startTime,
-      endTime,
-      durationMinutes: dur,
-      description: description.trim(),
-    };
-    saveEntry(entry);
-    setEntries(getEntries());
-    setForm({ date: format(new Date(), "yyyy-MM-dd"), startTime: "", endTime: "", description: "" });
+    await saveEntry({ id: generateId(), date, startTime, endTime, durationMinutes: dur, description: description.trim() });
+    await reload();
+    const now = new Date();
+    const t = format(now, "HH:mm");
+    setForm({ date: format(now, "yyyy-MM-dd"), startTime: t, endTime: t, description: "" });
   }
 
-  function handleDelete(id: string) {
-    deleteEntry(id);
-    setEntries(getEntries());
+  async function handleDelete(id: string) {
+    await deleteEntry(id);
+    await reload();
   }
 
   return (
     <div className="space-y-8">
       {/* Timer */}
       <section className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 text-center">
-        <div className="text-5xl font-mono font-bold text-slate-800 mb-6">
+        <div className={`text-5xl font-mono font-bold mb-6 transition-colors ${paused ? "text-amber-500" : "text-slate-800"}`}>
           {formatElapsed(elapsed)}
         </div>
-        {!running ? (
-          <button
-            onClick={handleStart}
-            className="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-8 py-3 rounded-xl text-lg transition-colors"
-          >
-            ▶ Start
-          </button>
-        ) : (
-          <button
-            onClick={handleStop}
-            className="bg-red-500 hover:bg-red-600 text-white font-semibold px-8 py-3 rounded-xl text-lg transition-colors"
-          >
-            ■ Stopp
-          </button>
-        )}
-        {running && startedAt && (
-          <p className="mt-3 text-sm text-slate-500">
-            Gestartet um {format(startedAt, "HH:mm")} Uhr
-          </p>
+
+        <div className="flex items-center justify-center gap-3">
+          {!running ? (
+            <button
+              onClick={start}
+              className="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-8 py-3 rounded-xl text-lg transition-colors"
+            >
+              ▶ Start
+            </button>
+          ) : (
+            <>
+              {!paused ? (
+                <button
+                  onClick={pause}
+                  className="bg-amber-500 hover:bg-amber-600 text-white font-semibold px-6 py-3 rounded-xl text-lg transition-colors"
+                >
+                  ⏸ Pause
+                </button>
+              ) : (
+                <button
+                  onClick={resume}
+                  className="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-6 py-3 rounded-xl text-lg transition-colors"
+                >
+                  ▶ Weiter
+                </button>
+              )}
+              <button
+                onClick={handleStop}
+                className="bg-red-500 hover:bg-red-600 text-white font-semibold px-6 py-3 rounded-xl text-lg transition-colors"
+              >
+                ■ Stopp
+              </button>
+            </>
+          )}
+        </div>
+
+        {paused && (
+          <p className="mt-3 text-sm text-amber-600 font-medium">Pausiert</p>
         )}
       </section>
 
       {/* Manueller Eintrag */}
       <section className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
-        <h2 className="font-semibold text-slate-700 mb-4">Manueller Eintrag</h2>
-        <form onSubmit={handleManualSubmit} className="space-y-3">
+        <h2 className="font-semibold text-slate-700 mb-4">Eintrag erfassen</h2>
+        <form onSubmit={handleManualSubmit} noValidate className="space-y-3">
           <div className="grid grid-cols-3 gap-3">
             <div>
               <label className="block text-xs text-slate-500 mb-1">Datum</label>
@@ -161,21 +138,11 @@ export default function HomePage() {
             </div>
             <div>
               <label className="block text-xs text-slate-500 mb-1">Von</label>
-              <input
-                type="time"
-                value={form.startTime}
-                onChange={(e) => setForm({ ...form, startTime: e.target.value })}
-                className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
+              <TimeSelect value={form.startTime} onChange={(v) => setForm({ ...form, startTime: v })} placeholder="Von" />
             </div>
             <div>
               <label className="block text-xs text-slate-500 mb-1">Bis</label>
-              <input
-                type="time"
-                value={form.endTime}
-                onChange={(e) => setForm({ ...form, endTime: e.target.value })}
-                className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
+              <TimeSelect value={form.endTime} onChange={(v) => setForm({ ...form, endTime: v })} placeholder="Bis" />
             </div>
           </div>
           <div>
@@ -193,7 +160,7 @@ export default function HomePage() {
             type="submit"
             className="bg-slate-800 hover:bg-slate-700 text-white font-medium px-5 py-2 rounded-lg text-sm transition-colors"
           >
-            + Eintrag hinzufügen
+            + Eintrag speichern
           </button>
         </form>
       </section>
@@ -216,26 +183,16 @@ export default function HomePage() {
         ) : (
           <ul className="space-y-2">
             {todayEntries.map((e) => (
-              <li
-                key={e.id}
-                className="flex items-center justify-between py-2 px-3 rounded-lg hover:bg-slate-50 group"
-              >
+              <li key={e.id} className="flex items-center justify-between py-2 px-3 rounded-lg hover:bg-slate-50 group">
                 <div className="flex items-center gap-3">
-                  <span className="text-xs font-mono text-slate-400">
-                    {e.startTime}–{e.endTime}
-                  </span>
+                  <span className="text-xs font-mono text-slate-400">{e.startTime}–{e.endTime}</span>
                   <span className="text-sm text-slate-700">
                     {e.description || <em className="text-slate-400">ohne Beschreibung</em>}
                   </span>
                 </div>
                 <div className="flex items-center gap-3">
                   <span className="text-xs font-medium text-slate-500">{formatDuration(e.durationMinutes)}</span>
-                  <button
-                    onClick={() => handleDelete(e.id)}
-                    className="text-slate-300 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity text-sm"
-                  >
-                    ✕
-                  </button>
+                  <button onClick={() => handleDelete(e.id)} className="text-slate-300 hover:text-red-500 transition-colors text-sm">✕</button>
                 </div>
               </li>
             ))}
