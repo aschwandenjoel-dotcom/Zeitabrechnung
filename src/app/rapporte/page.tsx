@@ -6,9 +6,15 @@ import { de } from "date-fns/locale";
 import { getEntries, formatDuration, formatChf } from "@/lib/storage";
 import { TimeEntry, HOURLY_RATE } from "@/lib/types";
 
+const MONTHS = ["Januar","Februar","März","April","Mai","Juni","Juli","August","September","Oktober","November","Dezember"];
+const YEARS = Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - 2 + i);
+
 export default function RapportePage() {
   const [entries, setEntries] = useState<TimeEntry[]>([]);
-  const [selectedMonth, setSelectedMonth] = useState(format(new Date(), "yyyy-MM"));
+  const now = new Date();
+  const [selYear, setSelYear] = useState(now.getFullYear());
+  const [selMonth, setSelMonth] = useState(now.getMonth() + 1); // 1-12
+  const selectedMonth = `${selYear}-${selMonth.toString().padStart(2, "0")}`;
 
   useEffect(() => {
     getEntries().then(setEntries);
@@ -112,12 +118,22 @@ export default function RapportePage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-semibold text-slate-800">Rapporte</h1>
-        <input
-          type="month"
-          value={selectedMonth}
-          onChange={(e) => setSelectedMonth(e.target.value)}
-          className="border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-        />
+        <div className="flex gap-2">
+          <select
+            value={selMonth}
+            onChange={(e) => setSelMonth(Number(e.target.value))}
+            className="border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+          >
+            {MONTHS.map((m, i) => <option key={i} value={i + 1}>{m}</option>)}
+          </select>
+          <select
+            value={selYear}
+            onChange={(e) => setSelYear(Number(e.target.value))}
+            className="border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+          >
+            {YEARS.map((y) => <option key={y} value={y}>{y}</option>)}
+          </select>
+        </div>
       </div>
 
       {/* Zusammenfassung */}

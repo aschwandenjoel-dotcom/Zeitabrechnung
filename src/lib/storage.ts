@@ -1,8 +1,14 @@
 import { TimeEntry } from "./types";
 
 export async function getEntries(): Promise<TimeEntry[]> {
-  const res = await fetch("/api/entries", { cache: "no-store" });
-  return res.json();
+  try {
+    const res = await fetch("/api/entries", { cache: "no-store" });
+    if (!res.ok) throw new Error(`API Fehler: ${res.status}`);
+    return res.json();
+  } catch (e) {
+    console.error("getEntries fehlgeschlagen:", e);
+    return [];
+  }
 }
 
 export async function saveEntry(entry: TimeEntry): Promise<void> {
