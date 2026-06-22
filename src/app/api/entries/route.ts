@@ -1,31 +1,31 @@
 import { NextResponse } from "next/server";
-import { readFileSync, writeFileSync, existsSync, mkdirSync } from "fs";
-import { join } from "path";
+import { sql, initDb } from "@/lib/db";
 import { TimeEntry } from "@/lib/types";
 
-const FILE = join(process.cwd(), "data", "entries.json");
-
-function readEntries(): TimeEntry[] {
-  if (!existsSync(FILE)) {
-    mkdirSync(join(process.cwd(), "data"), { recursive: true });
-    writeFileSync(FILE, "[]", "utf-8");
-    return [];
-  }
-  return JSON.parse(readFileSync(FILE, "utf-8"));
-}
-
-function writeEntries(entries: TimeEntry[]) {
-  writeFileSync(FILE, JSON.stringify(entries, null, 2), "utf-8");
-}
-
 export async function GET() {
-  return NextResponse.json(readEntries());
+  await initDb();
+  const rows = await sql`
+    SELECT id, date, start_time, end_time, duration_minutes, description
+    FROM entries
+    ORDER BY date DESC, start_time DESC
+  `;
+  const entries: TimeEntry[] = rows.map((r) => ({
+    id: r.id,
+    date: r.date,
+    startTime: r.start_time,
+    endTime: r.end_time,
+    durationMinutes: r.duration_minutes,
+    description: r.description,
+  }));
+  return NextResponse.json(entries);
 }
 
 export async function POST(req: Request) {
-  const entry: TimeEntry = await req.json();
-  const entries = readEntries();
-  entries.push(entry);
-  writeEntries(entries);
-  return NextResponse.json(entry, { status: 201 });
+  await initDb();
+  const e: TimeEntry = await req.json();
+  await sql`
+    INSERT INTO entries (id, date, start_time, end_time, duration_minutes, description)
+    VALUES (${e.id}, ${e.date}, ${e.startTime}, ${e.endTime}, ${e.durationMinutes}, ${e.description})
+  `;
+  return NextResponse.json(e, { status: 201 });
 }

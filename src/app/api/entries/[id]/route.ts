@@ -1,25 +1,14 @@
 import { NextResponse } from "next/server";
-import { readFileSync, writeFileSync, existsSync } from "fs";
-import { join } from "path";
+import { sql, initDb } from "@/lib/db";
 import { TimeEntry } from "@/lib/types";
-
-const FILE = join(process.cwd(), "data", "entries.json");
-
-function readEntries(): TimeEntry[] {
-  if (!existsSync(FILE)) return [];
-  return JSON.parse(readFileSync(FILE, "utf-8"));
-}
-
-function writeEntries(entries: TimeEntry[]) {
-  writeFileSync(FILE, JSON.stringify(entries, null, 2), "utf-8");
-}
 
 export async function DELETE(
   _req: Request,
   ctx: { params: Promise<{ id: string }> }
 ) {
+  await initDb();
   const { id } = await ctx.params;
-  writeEntries(readEntries().filter((e) => e.id !== id));
+  await sql`DELETE FROM entries WHERE id = ${id}`;
   return NextResponse.json({ ok: true });
 }
 
@@ -27,8 +16,17 @@ export async function PATCH(
   req: Request,
   ctx: { params: Promise<{ id: string }> }
 ) {
+  await initDb();
   const { id } = await ctx.params;
-  const updated: TimeEntry = await req.json();
-  writeEntries(readEntries().map((e) => (e.id === id ? updated : e)));
-  return NextResponse.json(updated);
+  const e: TimeEntry = await req.json();
+  await sql`
+    UPDATE entries
+    SET date = ${e.date},
+        start_time = ${e.startTime},
+        end_time = ${e.endTime},
+        duration_minutes = ${e.durationMinutes},
+        description = ${e.description}
+    WHERE id = ${id}
+  `;
+  return NextResponse.json(e);
 }
