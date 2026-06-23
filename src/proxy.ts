@@ -10,6 +10,13 @@ export const proxy = auth((req) => {
   if (!isPublic && !req.auth) {
     return NextResponse.redirect(new URL("/login", req.nextUrl));
   }
+
+  // /admin und /api/admin nur für Admins
+  const isAdminPath = pathname.startsWith("/admin") || pathname.startsWith("/api/admin");
+  if (isAdminPath && req.auth?.user?.role !== "admin") {
+    return NextResponse.redirect(new URL("/", req.nextUrl));
+  }
+
   return NextResponse.next();
 });
 

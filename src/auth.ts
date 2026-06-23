@@ -25,7 +25,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         if (!credentials?.email || !credentials?.password) return null;
 
         const rows = await sql`
-          SELECT id, email, name, password_hash
+          SELECT id, email, name, password_hash, role
           FROM users
           WHERE email = ${credentials.email as string}
         `;
@@ -38,16 +38,25 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         );
         if (!valid) return null;
 
-        return { id: user.id, email: user.email, name: user.name };
+        return { id: user.id, email: user.email, name: user.name, role: user.role };
       },
     }),
   ],
-  // Datenbankbasierte Sessions (passend zum NeonAdapter, löst PKCE-Konflikt)
   session: { strategy: "database" },
   callbacks: {
-    session({ session, user }) {
+    async session({ session, user }) {
+      // Rolle aus DB holen und in Session schreiben
+      const rows = await sql`SELECT role FROM users WHERE id = ${user.id}`;
       session.user.id = user.id;
+      session.user.role = (rows[0]?.role ?? "user") as string;
       return session;
+    },
+    async signIn({ user }) {
+      // Admin-E-Mail automatisch zur Admin-Rolle befördern
+      if (user.email && user.email === process.env.ADMIN_EMAIL) {
+        await sql`UPDATE users SET role = 'admin' WHERE email = ${user.email} AND role != 'admin'`;
+      }
+      return true;
     },
   },
   pages: {
