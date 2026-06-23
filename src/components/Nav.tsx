@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useTimer } from "@/lib/TimerContext";
+import UserMenu from "@/components/UserMenu";
 
 const links = [
   { href: "/", label: "Timer" },
@@ -48,6 +49,8 @@ export default function Nav() {
               </Link>
             ))}
           </nav>
+
+          <UserMenu />
         </div>
       </div>
     </header>
