@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useSession } from "next-auth/react";
 import { useTimer } from "@/lib/TimerContext";
 import UserMenu from "@/components/UserMenu";
 
@@ -21,6 +22,8 @@ function formatElapsed(s: number) {
 export default function Nav() {
   const path = usePathname();
   const { running, paused, elapsed } = useTimer();
+  const { data: session } = useSession();
+  const isAdmin = session?.user?.role === "admin";
 
   return (
     <header className="bg-white border-b border-slate-200">
@@ -28,7 +31,6 @@ export default function Nav() {
         <span className="font-semibold text-slate-800 tracking-tight">Zeitabrechnung</span>
 
         <div className="flex items-center gap-4">
-          {/* Timer-Indikator wenn läuft und nicht auf Timer-Seite */}
           {running && path !== "/" && (
             <div className={`flex items-center gap-1.5 text-xs font-mono font-semibold px-2.5 py-1 rounded-full ${paused ? "bg-amber-100 text-amber-700" : "bg-red-100 text-red-600"}`}>
               <span className={`w-1.5 h-1.5 rounded-full ${paused ? "bg-amber-500" : "bg-red-500 animate-pulse"}`} />
@@ -48,6 +50,16 @@ export default function Nav() {
                 {label}
               </Link>
             ))}
+            {isAdmin && (
+              <Link
+                href="/admin"
+                className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                  path === "/admin" ? "bg-amber-500 text-white" : "text-amber-600 hover:bg-amber-50"
+                }`}
+              >
+                Admin
+              </Link>
+            )}
           </nav>
 
           <UserMenu />

@@ -16,8 +16,12 @@ export async function initDb() {
       "emailVerified" TIMESTAMPTZ,
       image         TEXT,
       password_hash TEXT,
+      role          TEXT NOT NULL DEFAULT 'user',
       created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
     )
+  `;
+  await sql`
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS role TEXT NOT NULL DEFAULT 'user'
   `;
   await sql`
     CREATE TABLE IF NOT EXISTS accounts (
