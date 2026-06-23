@@ -42,7 +42,14 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       },
     }),
   ],
-  session: { strategy: "jwt" },
+  // Datenbankbasierte Sessions (passend zum NeonAdapter, löst PKCE-Konflikt)
+  session: { strategy: "database" },
+  callbacks: {
+    session({ session, user }) {
+      session.user.id = user.id;
+      return session;
+    },
+  },
   pages: {
     signIn: "/login",
     newUser: "/register",
