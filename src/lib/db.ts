@@ -7,13 +7,13 @@ if (!process.env.DATABASE_URL) {
 export const sql = neon(process.env.DATABASE_URL);
 
 export async function initDb() {
-  // Auth.js-Tabellen (users, accounts, sessions, verification_tokens)
+  // Auth.js-Tabellen (Spaltennamen exakt nach @auth/neon-adapter erwartet)
   await sql`
     CREATE TABLE IF NOT EXISTS users (
-      id            TEXT PRIMARY KEY,
+      id            TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
       name          TEXT,
       email         TEXT UNIQUE,
-      email_verified TIMESTAMPTZ,
+      "emailVerified" TIMESTAMPTZ,
       image         TEXT,
       password_hash TEXT,
       created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
@@ -21,27 +21,27 @@ export async function initDb() {
   `;
   await sql`
     CREATE TABLE IF NOT EXISTS accounts (
-      id                  TEXT PRIMARY KEY,
-      user_id             TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-      type                TEXT NOT NULL,
-      provider            TEXT NOT NULL,
-      provider_account_id TEXT NOT NULL,
-      refresh_token       TEXT,
-      access_token        TEXT,
-      expires_at          BIGINT,
-      token_type          TEXT,
-      scope               TEXT,
-      id_token            TEXT,
-      session_state       TEXT,
-      UNIQUE(provider, provider_account_id)
+      id                   TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
+      "userId"             TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      type                 TEXT NOT NULL,
+      provider             TEXT NOT NULL,
+      "providerAccountId"  TEXT NOT NULL,
+      refresh_token        TEXT,
+      access_token         TEXT,
+      expires_at           BIGINT,
+      token_type           TEXT,
+      scope                TEXT,
+      id_token             TEXT,
+      session_state        TEXT,
+      UNIQUE(provider, "providerAccountId")
     )
   `;
   await sql`
     CREATE TABLE IF NOT EXISTS sessions (
-      id            TEXT PRIMARY KEY,
-      session_token TEXT UNIQUE NOT NULL,
-      user_id       TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-      expires       TIMESTAMPTZ NOT NULL
+      id             TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
+      "sessionToken" TEXT UNIQUE NOT NULL,
+      "userId"       TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      expires        TIMESTAMPTZ NOT NULL
     )
   `;
   await sql`
