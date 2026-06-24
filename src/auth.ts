@@ -1,11 +1,13 @@
 import NextAuth from "next-auth";
 import NeonAdapter from "@auth/neon-adapter";
-import { Pool } from "@neondatabase/serverless";
+import { Pool, neonConfig } from "@neondatabase/serverless";
 import Google from "next-auth/providers/google";
 import Credentials from "next-auth/providers/credentials";
 import { neon } from "@neondatabase/serverless";
 import bcrypt from "bcryptjs";
+import ws from "ws";
 
+neonConfig.webSocketConstructor = ws;
 const pool = new Pool({ connectionString: process.env.DATABASE_URL! });
 const sql = neon(process.env.DATABASE_URL!);
 
